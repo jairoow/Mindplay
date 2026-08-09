@@ -1,0 +1,157 @@
+.section-title {
+  font-size: var(--fs-lg);
+  margin: var(--sp-8) 0 var(--sp-4);
+}
+
+.section-title:first-child {
+  margin-top: var(--sp-6);
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  padding: var(--sp-8) 0 var(--sp-6);
+}
+
+.hero__eyebrow {
+  margin-bottom: var(--sp-4);
+}
+
+.hero__title {
+  font-size: var(--fs-3xl);
+  margin-bottom: var(--sp-4);
+}
+
+.hero__title em {
+  font-style: normal;
+  color: var(--iris-strong);
+}
+
+.hero__subtitle {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  max-width: 460px;
+  margin-bottom: var(--sp-7);
+}
+
+.hero__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+@media (min-width: 480px) {
+  .hero__actions {
+    flex-direction: row;
+  }
+}
+
+.hero__stat-row {
+  display: flex;
+  gap: var(--sp-6);
+  margin-top: var(--sp-8);
+}
+
+.hero__stat-number {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xl);
+  color: var(--ink);
+}
+
+.hero__stat-label {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* ---------- Listados (Tests / Juegos) ---------- */
+.list-page__head {
+  padding: var(--sp-6) 0 var(--sp-3);
+}
+
+.list-page__title {
+  font-size: var(--fs-2xl);
+  margin-bottom: var(--sp-2);
+}
+
+.list-page__subtitle {
+  color: var(--muted);
+}
+
+.list-page__grid {
+  margin-top: var(--sp-5);
+}
+
+/* ---------- Detalle (intro antes de empezar) ---------- */
+.detail-intro {
+  text-align: center;
+  padding: var(--sp-9) 0 var(--sp-6);
+}
+
+.detail-intro__icon {
+  font-size: 2.75rem;
+  margin-bottom: var(--sp-4);
+}
+
+.detail-intro__title {
+  font-size: var(--fs-2xl);
+  margin-bottom: var(--sp-4);
+}
+
+.detail-intro__text {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  max-width: 440px;
+  margin: 0 auto var(--sp-7);
+}
+
+/* ---------- CTA de continuidad ---------- */
+.continue-cta {
+  background: var(--ink);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: var(--sp-7) var(--sp-6);
+  text-align: center;
+  margin: var(--sp-8) 0;
+}
+
+.continue-cta__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  margin-bottom: var(--sp-5);
+}
+
+.ad-section {
+  margin: var(--sp-8) 0;
+}
+
+/* ---------- Recomendaciones ---------- */
+.recommendations {
+  margin-top: var(--sp-8);
+}
+
+/* ---------- Not found ---------- */
+.not-found {
+  text-align: center;
+  padding: var(--sp-10) 0;
+}
+
+.not-found__title {
+  font-size: var(--fs-2xl);
+  margin-bottom: var(--sp-4);
+}
+
+/* ---------- Placeholder "Pareja" (sección aún sin contenido) ---------- */
+.placeholder-page {
+  text-align: center;
+  padding: var(--sp-10) var(--sp-4);
+}
+
+.placeholder-page__title {
+  font-size: var(--fs-2xl);
+  margin-bottom: var(--sp-3);
+}
+
+.placeholder-page__text {
+  color: var(--muted);
+  max-width: 380px;
+  margin: 0 auto;
+}

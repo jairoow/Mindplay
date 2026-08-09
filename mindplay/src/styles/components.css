@@ -1,0 +1,285 @@
+/* ---------- Button ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 52px;
+  padding: 0 var(--sp-6);
+  border-radius: var(--radius-pill);
+  border: none;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  font-family: var(--font-body);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  width: 100%;
+}
+
+@media (min-width: 480px) {
+  .btn {
+    width: auto;
+  }
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn--primary {
+  background: var(--ink);
+  color: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.btn--primary:hover {
+  background: var(--iris-strong);
+}
+
+.btn--accent {
+  background: var(--iris);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(124, 108, 240, 0.32);
+}
+
+.btn--accent:hover {
+  background: var(--iris-strong);
+}
+
+.btn--secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1.5px solid var(--border-strong);
+}
+
+.btn--secondary:hover {
+  border-color: var(--iris);
+  color: var(--iris-strong);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--muted);
+  min-height: 44px;
+  padding: 0 var(--sp-4);
+}
+
+.btn--ghost:hover {
+  color: var(--ink);
+}
+
+.btn--sm {
+  min-height: 40px;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-sm);
+}
+
+.btn--block {
+  width: 100%;
+}
+
+/* ---------- Card ---------- */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+
+.card--tappable {
+  cursor: pointer;
+}
+
+.card--tappable:active {
+  transform: scale(0.98);
+  box-shadow: var(--shadow-card);
+}
+
+.card__media {
+  height: 108px;
+  background: linear-gradient(135deg, var(--iris-tint), var(--amber-tint));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+.card__body {
+  padding: var(--sp-4) var(--sp-5) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.card__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.card__meta {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* Fila de tarjetas: scroll horizontal intencional (carrusel), nunca accidental */
+.card-row {
+  display: flex;
+  gap: var(--sp-4);
+  overflow-x: auto;
+  padding: var(--sp-1) var(--sp-5) var(--sp-3);
+  margin: 0 calc(var(--sp-5) * -1);
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.card-row::-webkit-scrollbar {
+  display: none;
+}
+
+.card-row .card {
+  flex: 0 0 220px;
+  scroll-snap-align: start;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4);
+}
+
+/* ---------- Badge ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+
+.badge.active,
+.badge:active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+.badge-row {
+  display: flex;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  padding: var(--sp-1) var(--sp-5);
+  margin: 0 calc(var(--sp-5) * -1);
+}
+
+.badge-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- ProgressBar ---------- */
+.progress-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--iris);
+  border-radius: var(--radius-pill);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+/* Anillo circular — elemento distintivo de MindPlay (usado en resultados/stats) */
+.reveal-ring {
+  --ring-size: 128px;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reveal-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.reveal-ring circle {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.reveal-ring circle.track {
+  stroke: var(--border);
+}
+
+.reveal-ring circle.value {
+  stroke: var(--iris);
+  transition: stroke-dashoffset var(--dur-slow) var(--ease-out);
+}
+
+.reveal-ring__label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* ---------- AnimatedSection ---------- */
+.animated-section {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
+}
+
+.animated-section.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ---------- AdSlot ---------- */
+.ad-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-sunken);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--muted-soft);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ad-slot--banner {
+  min-height: 90px;
+}
+
+.ad-slot--inline {
+  min-height: 64px;
+}
+
+.ad-slot--square {
+  min-height: 250px;
+  max-width: 300px;
+  margin: 0 auto;
+}

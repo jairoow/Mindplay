@@ -1,0 +1,126 @@
+.game-shell {
+  padding-top: var(--sp-5);
+}
+
+.game-shell__intro {
+  text-align: center;
+  padding: var(--sp-8) 0;
+}
+
+.game-shell__title {
+  font-size: var(--fs-2xl);
+  margin-bottom: var(--sp-4);
+}
+
+.game-shell__instructions {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  max-width: 420px;
+  margin: 0 auto var(--sp-7);
+}
+
+.game-shell__stage {
+  min-height: 320px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6);
+  text-align: center;
+  gap: var(--sp-4);
+}
+
+.game-shell__hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.reaction-pad {
+  width: 100%;
+  max-width: 280px;
+  height: 220px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: #fff;
+  transition: background var(--dur-fast) linear;
+  user-select: none;
+}
+
+.reaction-pad--wait {
+  background: var(--ink-soft);
+}
+
+.reaction-pad--go {
+  background: var(--success);
+}
+
+.reaction-pad--early {
+  background: var(--danger);
+}
+
+.game-result {
+  text-align: center;
+  padding: var(--sp-7) 0;
+}
+
+.game-result__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: var(--amber-tint);
+  color: #8a5b12;
+  border-radius: var(--radius-pill);
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.game-result__score {
+  font-family: var(--font-mono);
+  font-size: var(--fs-3xl);
+  color: var(--iris-strong);
+  margin: var(--sp-4) 0;
+}
+
+.game-result__label {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.game-result__record {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--muted-soft);
+  font-family: var(--font-mono);
+}
+
+.game-result__ad {
+  margin-top: var(--sp-6);
+}
+
+.game-result__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-top: var(--sp-7);
+}
+
+@media (min-width: 480px) {
+  .game-result__actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+}

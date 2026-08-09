@@ -1,0 +1,76 @@
+/*
+  MindPlay — Design tokens
+  Paleta: fondo "porcelana" frío (no crema) + acento "iris" (violeta-índigo, mente/introspección)
+  y "ámbar" como acento secundario reservado a datos/estadísticas.
+  Tipografía: Fraunces (display, con carácter) + Inter (UI/cuerpo) + IBM Plex Mono (datos).
+*/
+
+:root {
+  /* Color */
+  --ink: #15151a;
+  --ink-soft: #2b2b34;
+  --porcelain: #f4f3f6;
+  --surface: #ffffff;
+  --surface-sunken: #ecebf1;
+  --iris: #7c6cf0;
+  --iris-strong: #5f4de0;
+  --iris-tint: #efecff;
+  --amber: #e8a33d;
+  --amber-tint: #fdf1de;
+  --muted: #8a8a99;
+  --muted-soft: #b5b4c0;
+  --border: #e6e5ec;
+  --border-strong: #d3d1dc;
+  --danger: #e0594f;
+  --success: #3fae76;
+
+  /* Tipografía */
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Escala tipográfica (mobile-first) */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-md: 1.125rem;
+  --fs-lg: 1.375rem;
+  --fs-xl: 1.75rem;
+  --fs-2xl: 2.25rem;
+  --fs-3xl: 2.75rem;
+
+  /* Espaciado */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+  --sp-9: 56px;
+  --sp-10: 72px;
+
+  /* Radios y sombras */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(21, 21, 26, 0.04), 0 8px 24px rgba(21, 21, 26, 0.06);
+  --shadow-float: 0 12px 32px rgba(21, 21, 26, 0.14);
+
+  /* Layout */
+  --header-h: 60px;
+  --bottomnav-h: 68px;
+  --max-w: 720px;
+
+  /* Movimiento */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 380ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  /* Reservado: MindPlay usa modo claro único por ahora para mantener consistencia premium */
+}

@@ -1,0 +1,163 @@
+/* ---------- Header ---------- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  background: rgba(244, 243, 246, 0.86);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-header__inner {
+  width: 100%;
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 var(--sp-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-md);
+  color: var(--ink);
+}
+
+.brand__mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid var(--iris);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.brand__mark::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: var(--iris);
+}
+
+/* Nav de escritorio, oculta en móvil */
+.site-header__nav {
+  display: none;
+}
+
+@media (min-width: 720px) {
+  .site-header__nav {
+    display: flex;
+    gap: var(--sp-6);
+  }
+
+  .site-header__nav a {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--muted);
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+
+  .site-header__nav a.active,
+  .site-header__nav a:hover {
+    color: var(--ink);
+  }
+}
+
+/* ---------- BottomNav (mobile-first, navegación a una mano) ---------- */
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  height: var(--bottomnav-h);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border);
+  display: flex;
+}
+
+.bottom-nav__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 48px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  transition: color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.bottom-nav__item svg {
+  width: 22px;
+  height: 22px;
+}
+
+.bottom-nav__item.active {
+  color: var(--iris-strong);
+}
+
+.bottom-nav__item:active {
+  transform: scale(0.92);
+}
+
+@media (min-width: 720px) {
+  .bottom-nav {
+    display: none;
+  }
+}
+
+/* ---------- PageContainer ---------- */
+.page {
+  min-height: calc(100vh - var(--header-h));
+  padding-bottom: calc(var(--bottomnav-h) + var(--sp-8));
+}
+
+@media (min-width: 720px) {
+  .page {
+    padding-bottom: var(--sp-9);
+  }
+}
+
+/* ---------- Footer ---------- */
+.site-footer {
+  display: none;
+}
+
+@media (min-width: 720px) {
+  .site-footer {
+    display: block;
+    border-top: 1px solid var(--border);
+    padding: var(--sp-7) 0 var(--sp-9);
+    margin-top: var(--sp-9);
+  }
+
+  .site-footer__inner {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 0 var(--sp-5);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--muted);
+    font-size: var(--fs-sm);
+  }
+
+  .site-footer__links {
+    display: flex;
+    gap: var(--sp-5);
+  }
+}
