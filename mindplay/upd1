@@ -1,0 +1,2780 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <circle cx="16" cy="16" r="15" fill="#15151A"/>
+  <circle cx="16" cy="16" r="9" fill="none" stroke="#7C6CF0" stroke-width="2.5"/>
+  <circle cx="16" cy="16" r="2.5" fill="#7C6CF0"/>
+</svg>
+
+import { Link } from "react-router-dom";
+
+/**
+ * Tarjeta táctil reutilizable para previews de tests/juegos.
+ * props: title, meta (string), icon (emoji/nodo), to (ruta), description
+ * (texto corto opcional), badge (etiqueta opcional, ej. "Próximamente"),
+ * disabled (fuerza tarjeta no pulsable aunque haya `to`).
+ * Todas las props nuevas son opcionales: los usos existentes sin ellas
+ * siguen renderizando exactamente igual que antes.
+ */
+export default function Card({ title, meta, icon = "✦", to, description, badge, disabled }) {
+  const content = (
+    <>
+      {badge && <span className="card__badge">{badge}</span>}
+      <div className="card__media" aria-hidden="true">
+        <span>{icon}</span>
+      </div>
+      <div className="card__body">
+        <h3 className="card__title">{title}</h3>
+        {description && <p className="card__description">{description}</p>}
+        {meta && <span className="card__meta">{meta}</span>}
+      </div>
+    </>
+  );
+
+  if (to && !disabled) {
+    return (
+      <Link to={to} className="card card--tappable">
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={`card${disabled ? " card--disabled" : ""}`}>{content}</div>;
+}
+
+export default function Badge({ children, active, onClick }) {
+  const className = `badge${active ? " active" : ""}`;
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick}>
+        {children}
+      </button>
+    );
+  }
+  return <span className={className}>{children}</span>;
+}
+
+import { Link } from "react-router-dom";
+
+/**
+ * Botón reutilizable. Si recibe `to`, renderiza un Link; si no, un <button>.
+ * variant: "primary" | "accent" | "secondary" | "ghost"
+ */
+export default function Button({
+  children,
+  to,
+  href,
+  onClick,
+  variant = "primary",
+  size,
+  block,
+  type = "button",
+  ...rest
+}) {
+  const className = [
+    "btn",
+    `btn--${variant}`,
+    size === "sm" ? "btn--sm" : "",
+    block ? "btn--block" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (to) {
+    return (
+      <Link to={to} className={className} {...rest}>
+        {children}
+      </Link>
+    );
+  }
+
+  if (href) {
+    return (
+      <a href={href} className={className} {...rest}>
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <button type={type} className={className} onClick={onClick} {...rest}>
+      {children}
+    </button>
+  );
+}
+
+export default function ProgressBar({ value = 0, max = 100 }) {
+  const pct = Math.min(100, Math.max(0, (value / max) * 100));
+  return (
+    <div className="progress-bar" role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max}>
+      <div className="progress-bar__fill" style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+/**
+ * RevealRing — elemento visual de firma de MindPlay.
+ * Anillo circular animado usado para mostrar porcentajes/estadísticas en resultados.
+ */
+export function RevealRing({ value = 0, label, size = 128 }) {
+  const stroke = 8;
+  const radius = size / 2 - stroke;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (Math.min(100, Math.max(0, value)) / 100) * circumference;
+
+  return (
+    <div className="reveal-ring" style={{ "--ring-size": `${size}px` }}>
+      <svg viewBox={`0 0 ${size} ${size}`}>
+        <circle className="track" cx={size / 2} cy={size / 2} r={radius} />
+        <circle
+          className="value"
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <span className="reveal-ring__label">{label ?? `${Math.round(value)}%`}</span>
+    </div>
+  );
+}
+
+import { useEffect, useRef, useState } from "react";
+
+/**
+ * Envuelve una sección y le añade una entrada suave (fade + slide) al entrar en viewport.
+ * Usa IntersectionObserver + CSS puro (sin librerías de animación).
+ */
+export default function AnimatedSection({ children, className = "", as: Tag = "section", delay = 0 }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <Tag
+      ref={ref}
+      className={`animated-section${visible ? " in-view" : ""} ${className}`.trim()}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </Tag>
+  );
+}
+
+import { useState } from "react";
+import Button from "../ui/Button.jsx";
+import GameResult from "./GameResult.jsx";
+
+/**
+ * Envoltorio común para todos los minijuegos: intro con instrucciones,
+ * fase de juego (delegada al minijuego concreto vía `renderGame`) y resultado.
+ *
+ * `renderGame` recibe `{ finish }`, donde finish(scoreValue, scoreLabel, meta?)
+ * cierra la partida. `meta` es opcional (ej. { isNewRecord, recordLabel }).
+ *
+ * `attempt` fuerza el remontado del componente de juego en cada intento
+ * (vía `key`), para que su propio estado interno (temporizadores, fases...)
+ * arranque siempre limpio al pulsar "Volver a intentar".
+ */
+export default function GameShell({ game, renderGame, nextTo, nextLabel }) {
+  const [phase, setPhase] = useState("intro"); // intro | playing | result
+  const [score, setScore] = useState(null);
+  const [attempt, setAttempt] = useState(0);
+
+  function finish(scoreValue, scoreLabel, meta) {
+    setScore({ value: scoreValue, label: scoreLabel, meta });
+    setPhase("result");
+  }
+
+  function retry() {
+    setScore(null);
+    setAttempt((n) => n + 1);
+    setPhase("playing");
+  }
+
+  return (
+    <div className="game-shell">
+      {phase === "intro" && (
+        <div className="game-shell__intro">
+          <div className="eyebrow">{game.category}</div>
+          <h1 className="game-shell__title">{game.title}</h1>
+          <p className="game-shell__instructions">{game.instructions}</p>
+          <Button variant="accent" onClick={() => setPhase("playing")}>
+            Empezar
+          </Button>
+        </div>
+      )}
+
+      {phase === "playing" && <div key={attempt}>{renderGame({ finish })}</div>}
+
+      {phase === "result" && score && (
+        <GameResult
+          scoreValue={score.value}
+          scoreLabel={score.label}
+          meta={score.meta}
+          onRetry={retry}
+          nextTo={nextTo}
+          nextLabel={nextLabel}
+        />
+      )}
+    </div>
+  );
+}
+
+import Button from "../ui/Button.jsx";
+import AdSlot from "../ads/AdSlot.jsx";
+import { AD_PLACEMENTS } from "../../config/ads.js";
+
+export default function GameResult({ scoreLabel, scoreValue, meta, onRetry, nextTo, nextLabel = "Probar otro juego" }) {
+  return (
+    <div className="game-result">
+      {meta?.isNewRecord ? (
+        <div className="game-result__badge">🏆 Nuevo récord personal</div>
+      ) : (
+        <div className="eyebrow">Resultado</div>
+      )}
+      <div className="game-result__score">{scoreValue}</div>
+      <div className="game-result__label">{scoreLabel}</div>
+      {meta?.recordLabel && !meta.isNewRecord && <div className="game-result__record">Tu récord: {meta.recordLabel}</div>}
+
+      <div className="game-result__ad">
+        <AdSlot placement={AD_PLACEMENTS.GAME_RESULT} size="inline" />
+      </div>
+
+      <div className="game-result__actions">
+        <Button variant="secondary" onClick={onRetry}>
+          Volver a intentar
+        </Button>
+        {nextTo && (
+          <Button variant="accent" to={nextTo}>
+            {nextLabel}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+import OptionButton from "./OptionButton.jsx";
+
+export default function QuestionCard({ question, selectedOptionId, onSelect }) {
+  return (
+    <div className="question-card">
+      <h2 className="question-card__text">{question.text}</h2>
+      <div className="question-card__options">
+        {question.options.map((option) => (
+          <OptionButton
+            key={option.id}
+            text={option.text}
+            selected={selectedOptionId === option.id}
+            onClick={() => onSelect(option.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function OptionButton({ text, selected, onClick }) {
+  return (
+    <button type="button" className={`option-btn${selected ? " selected" : ""}`} onClick={onClick}>
+      <span>{text}</span>
+      <span className="option-btn__dot" aria-hidden="true" />
+    </button>
+  );
+}
+
+import { RevealRing } from "../ui/ProgressBar.jsx";
+import AnimatedSection from "../ui/AnimatedSection.jsx";
+
+/**
+ * Presenta visualmente un resultado ya calculado (título, tagline, descripción,
+ * fortalezas, "lo que te define", lado menos bueno, frase final y, opcionalmente,
+ * estadísticas / lista de películas / aviso legal). No depende de las respuestas
+ * concretas: todo lo que necesita vive en `result`, por eso el resultado es 100%
+ * reconstruible desde la URL /resultado/:test/:key.
+ *
+ * Cada bloque entra en pantalla con una aparición suave (fade + slide) al hacer
+ * scroll, vía AnimatedSection — sin librerías de animación externas.
+ */
+export default function ResultCard({ result }) {
+  return (
+    <div className="result-hero">
+      {result.emoji && (
+        <div className="result-hero__emoji" aria-hidden="true">
+          {result.emoji}
+        </div>
+      )}
+      <div className="eyebrow result-hero__eyebrow">Tu resultado</div>
+      <h1 className="result-hero__title">{result.title}</h1>
+      {result.tagline && <p className="result-hero__tagline">{result.tagline}</p>}
+
+      <div className="result-hero__ring">
+        <RevealRing value={result.matchPercent ?? 100} size={140} />
+      </div>
+
+      <p className="result-hero__description">{result.description}</p>
+
+      {result.strengths?.length > 0 && (
+        <AnimatedSection className="result-block" delay={40}>
+          <h2 className="result-block__title">Tus fortalezas</h2>
+          <ul className="result-traits__list result-traits__list--positive">
+            {result.strengths.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </AnimatedSection>
+      )}
+
+      {result.sections?.length > 0 && (
+        <AnimatedSection className="result-block" delay={100}>
+          <h2 className="result-block__title">Lo que te define</h2>
+          <div className="result-sections">
+            {result.sections.map((section) => (
+              <div className="result-section" key={section.heading}>
+                <h3 className="result-section__heading">{section.heading}</h3>
+                <p className="result-section__text">{section.text}</p>
+              </div>
+            ))}
+          </div>
+        </AnimatedSection>
+      )}
+
+      {result.weaknesses?.length > 0 && (
+        <AnimatedSection className="result-block" delay={160}>
+          <h2 className="result-block__title">{result.weaknessesLabel || "Tu lado menos bueno"}</h2>
+          <p className="result-block__hint">Nadie es perfecto. Por suerte, esto tiene su encanto.</p>
+          <ul className="result-traits__list result-traits__list--caution">
+            {result.weaknesses.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </AnimatedSection>
+      )}
+
+      {result.movieList?.length > 0 && (
+        <AnimatedSection className="result-block" delay={200}>
+          <h2 className="result-block__title">Te podrían gustar</h2>
+          <ul className="result-movie-list">
+            {result.movieList.map((movie) => (
+              <li key={movie}>{movie}</li>
+            ))}
+          </ul>
+        </AnimatedSection>
+      )}
+
+      {result.closingLine && (
+        <AnimatedSection className="result-quote" delay={220}>
+          <p className="result-quote__text">“{result.closingLine}”</p>
+        </AnimatedSection>
+      )}
+
+      {result.stats?.length > 0 && (
+        <AnimatedSection className="result-stats" delay={260} as="div">
+          {result.stats.map((stat) => (
+            <div className="result-stat" key={stat.label}>
+              <div className="result-stat__row">
+                <span>{stat.label}</span>
+                <span className="result-stat__value">{stat.value}%</span>
+              </div>
+              <div className="progress-bar">
+                <div className="progress-bar__fill" style={{ width: `${stat.value}%` }} />
+              </div>
+            </div>
+          ))}
+        </AnimatedSection>
+      )}
+
+      {result.disclaimer && <p className="result-disclaimer">{result.disclaimer}</p>}
+    </div>
+  );
+}
+
+import { useNavigate } from "react-router-dom";
+import { useQuiz } from "../../hooks/useQuiz.js";
+import { encodeStatValues } from "../../engines/scoring.js";
+import QuestionCard from "./QuestionCard.jsx";
+import ProgressBar from "../ui/ProgressBar.jsx";
+
+/**
+ * Motor genérico de tests: recibe cualquier objeto `test` (ver data/tests)
+ * y gestiona toda la experiencia de preguntas -> resultado, sin conocer
+ * el contenido concreto. Al terminar, navega a la URL compartible del
+ * resultado, codificando las estadísticas reales calculadas (si las hay)
+ * para que la página de resultado no dependa del estado del navegador.
+ *
+ * La navegación se dispara desde `onComplete`, que `useQuiz` invoca de
+ * forma síncrona en el mismo clic con el que se responde la última
+ * pregunta — no depende de un efecto que reaccione a un cambio de estado
+ * en un render posterior.
+ */
+export default function QuizEngine({ test }) {
+  const navigate = useNavigate();
+
+  function handleComplete(result) {
+    if (!result) return;
+    const encoded = encodeStatValues(result.statValues);
+    const query = encoded ? `?s=${encoded}` : "";
+    navigate(`/resultado/${test.slug}/${result.resultKey}${query}`, { replace: true });
+  }
+
+  const { currentQuestion, currentIndex, totalQuestions, progress, selections, selectOption, goBack } = useQuiz(
+    test,
+    { onComplete: handleComplete }
+  );
+
+  if (!currentQuestion) return null;
+
+  return (
+    <div className="quiz">
+      <div className="quiz__head">
+        {currentIndex > 0 && (
+          <button className="quiz__back" onClick={goBack} aria-label="Pregunta anterior">
+            ←
+          </button>
+        )}
+        <div className="quiz__progress-wrap">
+          <div className="quiz__step">
+            Pregunta {currentIndex + 1} de {totalQuestions}
+          </div>
+          <ProgressBar value={currentIndex + (selections[currentQuestion.id] ? 1 : 0)} max={totalQuestions} />
+        </div>
+      </div>
+
+      <QuestionCard
+        question={currentQuestion}
+        selectedOptionId={selections[currentQuestion.id]}
+        onSelect={selectOption}
+      />
+    </div>
+  );
+}
+
+export default function PageContainer({ children, className = "" }) {
+  return <main className={`page ${className}`.trim()}>{children}</main>;
+}
+
+import { NavLink } from "react-router-dom";
+
+const ICONS = {
+  home: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 11l9-8 9 8" />
+      <path d="M5 10v10h14V10" />
+    </svg>
+  ),
+  tests: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
+  games: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="7" width="18" height="11" rx="4" />
+      <path d="M8 12h.01M8 12H8m0 0v0M16 11.5h.01M13.5 13h.01" />
+    </svg>
+  ),
+  couple: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="9" r="3.2" />
+      <circle cx="15" cy="9" r="3.2" />
+      <path d="M4 20c0-3 2.5-5 5-5s5 2 5 5" />
+      <path d="M10 20c0-3 2.5-5 5-5s5 2 5 5" />
+    </svg>
+  ),
+};
+
+const NAV_ITEMS = [
+  { to: "/", label: "Inicio", end: true, icon: "home" },
+  { to: "/tests", label: "Tests", icon: "tests" },
+  { to: "/juegos", label: "Juegos", icon: "games" },
+  { to: "/pareja", label: "Pareja", icon: "couple" },
+];
+
+export default function BottomNav() {
+  return (
+    <nav className="bottom-nav" aria-label="Navegación inferior">
+      {NAV_ITEMS.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          className={({ isActive }) => `bottom-nav__item${isActive ? " active" : ""}`}
+        >
+          {ICONS[item.icon]}
+          <span>{item.label}</span>
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+export default function Footer() {
+  return (
+    <footer className="site-footer">
+      <div className="site-footer__inner">
+        <span>© {new Date().getFullYear()} MindPlay</span>
+        <div className="site-footer__links">
+          <a href="/tests">Tests</a>
+          <a href="/juegos">Juegos</a>
+          <a href="/pareja">Pareja</a>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+import { NavLink } from "react-router-dom";
+
+const NAV_ITEMS = [
+  { to: "/", label: "Inicio", end: true },
+  { to: "/tests", label: "Tests" },
+  { to: "/juegos", label: "Juegos" },
+  { to: "/pareja", label: "Pareja" },
+];
+
+export default function Header() {
+  return (
+    <header className="site-header">
+      <div className="site-header__inner">
+        <NavLink to="/" className="brand" aria-label="MindPlay — inicio">
+          <span className="brand__mark" aria-hidden="true" />
+          MindPlay
+        </NavLink>
+        <nav className="site-header__nav" aria-label="Navegación principal">
+          {NAV_ITEMS.map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end}>
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+    </header>
+  );
+}
+
+import Card from "../ui/Card.jsx";
+import { TESTS } from "../../data/tests/index.js";
+import { GAMES } from "../../data/games/index.js";
+
+/**
+ * "Puede que también te guste" — combina tests y juegos (excluyendo el actual)
+ * para fomentar el recorrido Test → Resultado → Otro test → Juego → ...
+ * excludeType/excludeSlug identifican el contenido que se está viendo ahora mismo.
+ */
+export default function Recommendations({ excludeType, excludeSlug, limit = 3, title = "Puede que también te guste" }) {
+  const pool = [
+    ...TESTS.map((t) => ({ type: "test", slug: t.slug, title: t.title, category: t.category, icon: t.icon })),
+    ...GAMES.map((g) => ({ type: "game", slug: g.slug, title: g.title, category: g.category, icon: g.icon })),
+  ].filter((item) => !(item.type === excludeType && item.slug === excludeSlug));
+
+  const items = pool.slice(0, limit);
+
+  if (items.length === 0) return null;
+
+  return (
+    <section className="recommendations">
+      <h2 className="section-title">{title}</h2>
+      <div className="card-row">
+        {items.map((item) => (
+          <Card
+            key={`${item.type}-${item.slug}`}
+            title={item.title}
+            meta={item.category}
+            icon={item.icon}
+            to={item.type === "test" ? `/tests/${item.slug}` : `/juegos/${item.slug}`}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+import { ADS_CONFIG } from "../../config/ads.js";
+
+const SIZE_CLASS = {
+  banner: "ad-slot--banner",
+  inline: "ad-slot--inline",
+  square: "ad-slot--square",
+};
+
+/**
+ * Hueco publicitario reutilizable, sin proveedor conectado todavía.
+ * placement: identificador de la posición (ver config/ads.js -> AD_PLACEMENTS)
+ * size: "banner" | "inline" | "square"
+ *
+ * Si ADS_CONFIG.ADS_ENABLED es false, no se renderiza nada salvo que
+ * SHOW_PLACEHOLDERS esté activo (útil en desarrollo para ver el hueco reservado).
+ */
+export default function AdSlot({ placement, size = "banner" }) {
+  if (!ADS_CONFIG.ADS_ENABLED) {
+    if (!ADS_CONFIG.SHOW_PLACEHOLDERS) return null;
+    return (
+      <div className={`ad-slot ${SIZE_CLASS[size] ?? SIZE_CLASS.banner}`} data-placement={placement} data-size={size}>
+        Espacio publicitario · {placement}
+      </div>
+    );
+  }
+
+  // Cuando ADS_ENABLED sea true, aquí se montará el proveedor real
+  // (ej. inyección de script, componente del SDK, etc.) según `placement`/`size`.
+  return <div className={`ad-slot ${SIZE_CLASS[size] ?? SIZE_CLASS.banner}`} data-placement={placement} data-size={size} />;
+}
+
+/**
+ * Configuración global de publicidad.
+ * Mientras `ADS_ENABLED` sea false, AdSlot no renderiza nada (ni el placeholder),
+ * de forma que la sección de anuncios se puede activar en un único punto
+ * cuando llegue el momento de conectar un proveedor real.
+ *
+ * `SHOW_PLACEHOLDERS` permite ver el hueco reservado durante el desarrollo
+ * sin activar anuncios reales.
+ */
+export const ADS_CONFIG = {
+  ADS_ENABLED: false,
+  SHOW_PLACEHOLDERS: true,
+};
+
+export const AD_PLACEMENTS = {
+  HOME_MID: "home-mid",
+  TEST_BETWEEN: "test-between",
+  TEST_RESULT: "test-result",
+  GAME_BETWEEN: "game-between",
+  GAME_RESULT: "game-result",
+};
+
+import { useMemo, useState } from "react";
+import { calculateResult } from "../engines/scoring.js";
+
+/**
+ * Gestiona el estado de un test: pregunta actual, respuestas seleccionadas
+ * y el cálculo del resultado final. No sabe nada de UI ni de rutas.
+ *
+ * `onComplete(result)` (opcional) se invoca de forma síncrona, en el mismo
+ * evento de clic, en cuanto se responde la última pregunta — con el
+ * resultado ya calculado a partir de las respuestas actualizadas. Así la
+ * pantalla de resultados no depende de que un futuro render/efecto detecte
+ * el cambio de estado, que es lo que hacía que, tras responder la última
+ * pregunta, el test se quedara parado en ella en lugar de avanzar.
+ */
+export function useQuiz(test, { onComplete } = {}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selections, setSelections] = useState({});
+
+  const totalQuestions = test.questions.length;
+  const currentQuestion = test.questions[currentIndex];
+  const isLastQuestion = currentIndex === totalQuestions - 1;
+  const progress = ((currentIndex + (selections[currentQuestion?.id] ? 1 : 0)) / totalQuestions) * 100;
+
+  // Se mantiene disponible como resultado derivado (por ejemplo, para quien
+  // consuma este hook sin pasar `onComplete`), pero la navegación ya no
+  // depende de él.
+  const result = useMemo(() => {
+    if (Object.keys(selections).length < totalQuestions) return null;
+    return calculateResult(test, selections);
+  }, [selections, test, totalQuestions]);
+
+  function selectOption(optionId) {
+    const next = { ...selections, [currentQuestion.id]: optionId };
+    setSelections(next);
+
+    if (isLastQuestion) {
+      // Última pregunta: calculamos el resultado ya mismo con las respuestas
+      // completas y avisamos inmediatamente, sin esperar a un render extra.
+      const finalResult = calculateResult(test, next);
+      onComplete?.(finalResult);
+    } else {
+      setTimeout(() => setCurrentIndex((i) => i + 1), 180);
+    }
+  }
+
+  function goBack() {
+    setCurrentIndex((i) => Math.max(0, i - 1));
+  }
+
+  return {
+    currentQuestion,
+    currentIndex,
+    totalQuestions,
+    isLastQuestion,
+    progress,
+    selections,
+    selectOption,
+    goBack,
+    result,
+  };
+}
+
+import { useCallback, useRef, useState } from "react";
+
+/**
+ * Cronómetro simple en milisegundos para minijuegos que miden tiempo de reacción
+ * o duración de una prueba. No depende de ningún juego concreto.
+ */
+export function useGameTimer() {
+  const startRef = useRef(null);
+  const [elapsed, setElapsed] = useState(0);
+
+  const start = useCallback(() => {
+    startRef.current = performance.now();
+  }, []);
+
+  const stop = useCallback(() => {
+    if (startRef.current == null) return 0;
+    const ms = Math.round(performance.now() - startRef.current);
+    setElapsed(ms);
+    startRef.current = null;
+    return ms;
+  }, []);
+
+  const reset = useCallback(() => {
+    startRef.current = null;
+    setElapsed(0);
+  }, []);
+
+  return { start, stop, reset, elapsed };
+}
+
+import { Routes, Route } from "react-router-dom";
+import Header from "./components/layout/Header.jsx";
+import BottomNav from "./components/layout/BottomNav.jsx";
+import Footer from "./components/layout/Footer.jsx";
+import Home from "./pages/Home.jsx";
+import TestsList from "./pages/TestsList.jsx";
+import TestDetail from "./pages/TestDetail.jsx";
+import GamesList from "./pages/GamesList.jsx";
+import GameDetail from "./pages/GameDetail.jsx";
+import Couple from "./pages/Couple.jsx";
+import ResultPage from "./pages/ResultPage.jsx";
+import NotFound from "./pages/NotFound.jsx";
+
+export default function App() {
+  return (
+    <>
+      <Header />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/tests" element={<TestsList />} />
+        <Route path="/tests/:slug" element={<TestDetail />} />
+        <Route path="/juegos" element={<GamesList />} />
+        <Route path="/juegos/:slug" element={<GameDetail />} />
+        <Route path="/pareja" element={<Couple />} />
+        <Route path="/resultado/:testSlug/:resultKey" element={<ResultPage />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      <Footer />
+      <BottomNav />
+    </>
+  );
+}
+
+import ReactionTimeGame from "./ReactionTimeGame.jsx";
+
+/**
+ * Asocia el slug de cada juego con su componente interactivo.
+ * Añadir un juego nuevo: crear el componente y registrarlo aquí.
+ */
+export const GAME_COMPONENTS = {
+  "tiempo-de-reaccion": ReactionTimeGame,
+};
+
+import { useEffect, useRef, useState } from "react";
+import { useGameTimer } from "../../hooks/useGameTimer.js";
+import { saveRecordIfBetter } from "../../utils/records.js";
+
+const GAME_SLUG = "tiempo-de-reaccion";
+
+/**
+ * Lógica interactiva del juego "Tiempo de reacción".
+ * Recibe `finish(scoreValue, scoreLabel, meta)` desde GameShell para cerrar la partida.
+ */
+export default function ReactionTimeGame({ finish }) {
+  const [state, setState] = useState("waiting"); // waiting | go | early
+  const timeoutRef = useRef(null);
+  const timer = useGameTimer();
+
+  useEffect(() => {
+    const delay = 1200 + Math.random() * 2200;
+    timeoutRef.current = setTimeout(() => {
+      setState("go");
+      timer.start();
+    }, delay);
+
+    return () => clearTimeout(timeoutRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleTap() {
+    if (state === "waiting") {
+      clearTimeout(timeoutRef.current);
+      setState("early");
+      return;
+    }
+    if (state === "go") {
+      const ms = timer.stop();
+      const { record, isNewRecord } = saveRecordIfBetter(GAME_SLUG, ms, "lowerIsBetter");
+      finish(`${ms} ms`, "Tu tiempo de reacción", { isNewRecord, recordLabel: `${record} ms` });
+    }
+  }
+
+  function handleRetryEarly() {
+    setState("waiting");
+    const delay = 1200 + Math.random() * 2200;
+    timeoutRef.current = setTimeout(() => {
+      setState("go");
+      timer.start();
+    }, delay);
+  }
+
+  const label = state === "waiting" ? "Espera…" : state === "go" ? "¡Ahora!" : "Demasiado pronto";
+
+  return (
+    <div className="game-shell__stage">
+      <button
+        type="button"
+        className={`reaction-pad reaction-pad--${state === "go" ? "go" : state === "early" ? "early" : "wait"}`}
+        onClick={state === "early" ? handleRetryEarly : handleTap}
+        aria-live="polite"
+      >
+        {state === "early" ? "Toca para reintentar" : label}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Motor de cálculo de resultados, agnóstico al contenido de cada test.
+ * Un test define `resultLogic` y sus preguntas llevan pesos por opción;
+ * este módulo solo interpreta esos datos, nunca contiene texto de ningún test.
+ *
+ * Estrategias soportadas:
+ *
+ * - "weighted": cada opción puede sumar puntos a) a una o varias keys de
+ *   `test.results` (`option.weight`, decide qué resultado gana) y b) a una
+ *   o varias dimensiones medibles (`option.dimensions`, ej. disciplina,
+ *   empatía...). Las dimensiones se normalizan a 0-100 en función del máximo
+ *   posible en ese test, así que las estadísticas del resultado son reales,
+ *   no números fijos. Cada resultado declara `statKeys` (qué dimensiones
+ *   mostrar) y opcionalmente `fallbackStats` (valores de referencia para
+ *   cuando se visita la URL de resultado sin haber hecho el test).
+ *
+ * - "category": cada opción pertenece a una única categoría (`option.category`,
+ *   un string). Gana la categoría elegida más veces. Pensado para tests más
+ *   simples que no necesitan combinar dimensiones.
+ *
+ * - "index": cada opción aporta un valor numérico 0-100 (`option.value`).
+ *   Se promedia y el resultado final es ese número, que se ubica dentro de
+ *   un tramo (`test.results[i].min/max`). Usada por tests tipo "índice"
+ *   (ej. mentalidad financiera).
+ */
+
+function computeDimensionMax(test) {
+  const max = {};
+  test.questions.forEach((question) => {
+    const perQuestionMax = {};
+    question.options.forEach((option) => {
+      if (!option.dimensions) return;
+      Object.entries(option.dimensions).forEach(([key, value]) => {
+        perQuestionMax[key] = Math.max(perQuestionMax[key] || 0, value);
+      });
+    });
+    Object.entries(perQuestionMax).forEach(([key, value]) => {
+      max[key] = (max[key] || 0) + value;
+    });
+  });
+  return max;
+}
+
+function calculateWeighted(test, selections) {
+  const archetypeTotals = {};
+  const dimensionTotals = {};
+
+  test.questions.forEach((question) => {
+    const option = question.options.find((o) => o.id === selections[question.id]);
+    if (!option) return;
+
+    if (option.weight) {
+      Object.entries(option.weight).forEach(([key, value]) => {
+        archetypeTotals[key] = (archetypeTotals[key] || 0) + value;
+      });
+    }
+    if (option.dimensions) {
+      Object.entries(option.dimensions).forEach(([key, value]) => {
+        dimensionTotals[key] = (dimensionTotals[key] || 0) + value;
+      });
+    }
+  });
+
+  let winnerKey = test.results[0]?.key;
+  let winnerScore = -Infinity;
+  Object.entries(archetypeTotals).forEach(([key, score]) => {
+    if (score > winnerScore) {
+      winnerScore = score;
+      winnerKey = key;
+    }
+  });
+
+  const dimensionMax = computeDimensionMax(test);
+  const dimensionPercent = {};
+  Object.keys(dimensionMax).forEach((key) => {
+    dimensionPercent[key] = dimensionMax[key]
+      ? Math.max(0, Math.min(100, Math.round(((dimensionTotals[key] || 0) / dimensionMax[key]) * 100)))
+      : 0;
+  });
+
+  const winnerResult = test.results.find((r) => r.key === winnerKey);
+  const statValues = winnerResult?.statKeys ? winnerResult.statKeys.map((key) => dimensionPercent[key] ?? 0) : null;
+
+  return { resultKey: winnerKey, statValues };
+}
+
+function calculateCategory(test, selections) {
+  const counts = {};
+
+  test.questions.forEach((question) => {
+    const option = question.options.find((o) => o.id === selections[question.id]);
+    if (!option || !option.category) return;
+    counts[option.category] = (counts[option.category] || 0) + 1;
+  });
+
+  let winnerKey = test.results[0]?.key;
+  let winnerCount = -Infinity;
+  Object.entries(counts).forEach(([key, count]) => {
+    if (count > winnerCount) {
+      winnerCount = count;
+      winnerKey = key;
+    }
+  });
+
+  return { resultKey: winnerKey, statValues: null };
+}
+
+function calculateIndex(test, selections) {
+  let sum = 0;
+  let count = 0;
+
+  test.questions.forEach((question) => {
+    const option = question.options.find((o) => o.id === selections[question.id]);
+    if (!option || typeof option.value !== "number") return;
+    sum += option.value;
+    count += 1;
+  });
+
+  const score = count ? Math.round(sum / count) : 50;
+  return { resultKey: String(score), statValues: null };
+}
+
+const STRATEGIES = {
+  weighted: calculateWeighted,
+  category: calculateCategory,
+  index: calculateIndex,
+};
+
+/**
+ * Punto de entrada único: calcula el resultado de un test ya respondido.
+ * Devuelve { resultKey, statValues }. `statValues` (si existe) son los
+ * valores reales, en el mismo orden que `statKeys` del resultado ganador,
+ * listos para codificarse en la URL de resultado.
+ */
+export function calculateResult(test, selections) {
+  const strategy = STRATEGIES[test.resultLogic] || calculateWeighted;
+  return strategy(test, selections);
+}
+
+/** Codifica los valores de estadísticas para meterlos en la URL como ?s=92,74,22 */
+export function encodeStatValues(values) {
+  return Array.isArray(values) && values.length ? values.join(",") : "";
+}
+
+/** Decodifica el parámetro ?s=... de vuelta a un array de números, o null si no es válido */
+export function decodeStatValues(param) {
+  if (!param) return null;
+  const values = param.split(",").map(Number);
+  return values.every((n) => Number.isFinite(n)) ? values : null;
+}
+
+/**
+ * Reconstruye un resultado a partir de su key, tal y como viene en la URL
+ * (/resultado/:testSlug/:resultKey). No depende del estado del navegador:
+ * si se pasan `statValues` (decodificados de ?s=...) se muestran las
+ * estadísticas reales de esa sesión; si no, se usa `fallbackStats` del
+ * resultado (para cuando se abre la URL directamente, ej. un enlace viejo).
+ */
+export function resolveResult(test, key, statValues) {
+  if (!test) return null;
+
+  if (test.resultLogic === "index") {
+    const score = Math.max(0, Math.min(100, Number(key)));
+    if (Number.isNaN(score)) return null;
+    const band =
+      test.results.find((r) => score >= r.min && score <= r.max) || test.results[test.results.length - 1];
+    return { ...band, key, matchPercent: score, disclaimer: band.disclaimer || test.disclaimer };
+  }
+
+  const base = test.results.find((r) => r.key === key);
+  if (!base) return null;
+
+  let stats = base.stats || [];
+  if (base.statKeys) {
+    if (Array.isArray(statValues) && statValues.length === base.statKeys.length) {
+      stats = base.statKeys.map((k, i) => ({ label: test.dimensionLabels?.[k] || k, value: statValues[i] }));
+    } else if (base.fallbackStats) {
+      stats = base.statKeys.map((k) => ({ label: test.dimensionLabels?.[k] || k, value: base.fallbackStats[k] ?? 50 }));
+    }
+  }
+
+  const matchPercent = base.matchPercent ?? (stats.length ? Math.round(stats.reduce((sum, s) => sum + s.value, 0) / stats.length) : 100);
+
+  return { ...base, stats, matchPercent, disclaimer: base.disclaimer || test.disclaimer };
+}
+
+/* ---------- Button ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 52px;
+  padding: 0 var(--sp-6);
+  border-radius: var(--radius-pill);
+  border: none;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  font-family: var(--font-body);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  width: 100%;
+}
+
+@media (min-width: 480px) {
+  .btn {
+    width: auto;
+  }
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn--primary {
+  background: var(--ink);
+  color: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.btn--primary:hover {
+  background: var(--iris-strong);
+}
+
+.btn--accent {
+  background: var(--iris);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(124, 108, 240, 0.32);
+}
+
+.btn--accent:hover {
+  background: var(--iris-strong);
+}
+
+.btn--secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1.5px solid var(--border-strong);
+}
+
+.btn--secondary:hover {
+  border-color: var(--iris);
+  color: var(--iris-strong);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--muted);
+  min-height: 44px;
+  padding: 0 var(--sp-4);
+}
+
+.btn--ghost:hover {
+  color: var(--ink);
+}
+
+.btn--sm {
+  min-height: 40px;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-sm);
+}
+
+.btn--block {
+  width: 100%;
+}
+
+/* ---------- Card ---------- */
+.card {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+
+.card--tappable {
+  cursor: pointer;
+}
+
+.card--tappable:active {
+  transform: scale(0.98);
+  box-shadow: var(--shadow-card);
+}
+
+.card__media {
+  height: 108px;
+  background: linear-gradient(135deg, var(--iris-tint), var(--amber-tint));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+.card__body {
+  padding: var(--sp-4) var(--sp-5) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.card__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.card__meta {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.card__description {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.card__badge {
+  position: absolute;
+  top: var(--sp-3);
+  right: var(--sp-3);
+  z-index: 1;
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.card--disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+/* Fila de tarjetas: scroll horizontal intencional (carrusel), nunca accidental */
+.card-row {
+  display: flex;
+  gap: var(--sp-4);
+  overflow-x: auto;
+  padding: var(--sp-1) var(--sp-5) var(--sp-3);
+  margin: 0 calc(var(--sp-5) * -1);
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.card-row::-webkit-scrollbar {
+  display: none;
+}
+
+.card-row .card {
+  flex: 0 0 220px;
+  scroll-snap-align: start;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4);
+}
+
+/* ---------- Badge ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+
+.badge.active,
+.badge:active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+.badge-row {
+  display: flex;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  padding: var(--sp-1) var(--sp-5);
+  margin: 0 calc(var(--sp-5) * -1);
+}
+
+.badge-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- ProgressBar ---------- */
+.progress-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--iris);
+  border-radius: var(--radius-pill);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+/* Anillo circular — elemento distintivo de MindPlay (usado en resultados/stats) */
+.reveal-ring {
+  --ring-size: 128px;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reveal-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.reveal-ring circle {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.reveal-ring circle.track {
+  stroke: var(--border);
+}
+
+.reveal-ring circle.value {
+  stroke: var(--iris);
+  transition: stroke-dashoffset var(--dur-slow) var(--ease-out);
+}
+
+.reveal-ring__label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* ---------- AnimatedSection ---------- */
+.animated-section {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
+}
+
+.animated-section.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ---------- AdSlot ---------- */
+.ad-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-sunken);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--muted-soft);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ad-slot--banner {
+  min-height: 90px;
+}
+
+.ad-slot--inline {
+  min-height: 64px;
+}
+
+.ad-slot--square {
+  min-height: 250px;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+/*
+  MindPlay — Design tokens
+  Paleta: fondo "porcelana" frío (no crema) + acento "iris" (violeta-índigo, mente/introspección)
+  y "ámbar" como acento secundario reservado a datos/estadísticas.
+  Tipografía: Fraunces (display, con carácter) + Inter (UI/cuerpo) + IBM Plex Mono (datos).
+*/
+
+:root {
+  /* Color */
+  --ink: #15151a;
+  --ink-soft: #2b2b34;
+  --porcelain: #f4f3f6;
+  --surface: #ffffff;
+  --surface-sunken: #ecebf1;
+  --iris: #7c6cf0;
+  --iris-strong: #5f4de0;
+  --iris-tint: #efecff;
+  --amber: #e8a33d;
+  --amber-tint: #fdf1de;
+  --muted: #8a8a99;
+  --muted-soft: #b5b4c0;
+  --border: #e6e5ec;
+  --border-strong: #d3d1dc;
+  --danger: #e0594f;
+  --success: #3fae76;
+
+  /* Tipografía */
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Escala tipográfica (mobile-first) */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-md: 1.125rem;
+  --fs-lg: 1.375rem;
+  --fs-xl: 1.75rem;
+  --fs-2xl: 2.25rem;
+  --fs-3xl: 2.75rem;
+
+  /* Espaciado */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+  --sp-9: 56px;
+  --sp-10: 72px;
+
+  /* Radios y sombras */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(21, 21, 26, 0.04), 0 8px 24px rgba(21, 21, 26, 0.06);
+  --shadow-float: 0 12px 32px rgba(21, 21, 26, 0.14);
+
+  /* Layout */
+  --header-h: 60px;
+  --bottomnav-h: 68px;
+  --max-w: 720px;
+
+  /* Movimiento */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 380ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  /* Reservado: MindPlay usa modo claro único por ahora para mantener consistencia premium */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--porcelain);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Evita cualquier desbordamiento horizontal accidental en móvil */
+#root {
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Foco visible siempre — accesibilidad de teclado */
+:focus-visible {
+  outline: 2px solid var(--iris);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* Respeta reduce-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.container {
+  width: 100%;
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 var(--sp-5);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--iris-strong);
+  font-weight: 500;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.game-shell {
+  padding-top: var(--sp-5);
+}
+
+.game-shell__intro {
+  text-align: center;
+  padding: var(--sp-8) 0;
+}
+
+.game-shell__title {
+  font-size: var(--fs-2xl);
+  margin-bottom: var(--sp-4);
+}
+
+.game-shell__instructions {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  max-width: 420px;
+  margin: 0 auto var(--sp-7);
+}
+
+.game-shell__stage {
+  min-height: 320px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6);
+  text-align: center;
+  gap: var(--sp-4);
+}
+
+.game-shell__hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.reaction-pad {
+  width: 100%;
+  max-width: 280px;
+  height: 220px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: #fff;
+  transition: background var(--dur-fast) linear;
+  user-select: none;
+}
+
+.reaction-pad--wait {
+  background: var(--ink-soft);
+}
+
+.reaction-pad--go {
+  background: var(--success);
+}
+
+.reaction-pad--early {
+  background: var(--danger);
+}
+
+.game-result {
+  text-align: center;
+  padding: var(--sp-7) 0;
+}
+
+.game-result__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: var(--amber-tint);
+  color: #8a5b12;
+  border-radius: var(--radius-pill);
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.game-result__score {
+  font-family: var(--font-mono);
+  font-size: var(--fs-3xl);
+  color: var(--iris-strong);
+  margin: var(--sp-4) 0;
+}
+
+.game-result__label {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.game-result__record {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--muted-soft);
+  font-family: var(--font-mono);
+}
+
+.game-result__ad {
+  margin-top: var(--sp-6);
+}
+
+.game-result__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-top: var(--sp-7);
+}
+
+@media (min-width: 480px) {
+  .game-result__actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+
+.quiz {
+  padding-top: var(--sp-5);
+}
+
+.quiz__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-7);
+}
+
+.quiz__back {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.quiz__progress-wrap {
+  flex: 1;
+}
+
+.quiz__step {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  margin-bottom: var(--sp-2);
+}
+
+.question-card {
+  margin-bottom: var(--sp-7);
+}
+
+.question-card__text {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  margin-bottom: var(--sp-6);
+}
+
+.question-card__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.option-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  width: 100%;
+  min-height: 60px;
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  text-align: left;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--ink);
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.option-btn:hover {
+  border-color: var(--iris);
+}
+
+.option-btn:active {
+  transform: scale(0.98);
+}
+
+.option-btn.selected {
+  border-color: var(--iris);
+  background: var(--iris-tint);
+  color: var(--iris-strong);
+}
+
+.option-btn__dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  flex-shrink: 0;
+}
+
+.option-btn.selected .option-btn__dot {
+  border-color: var(--iris);
+  background: var(--iris);
+}
+
+/* ---------- Result ---------- */
+.result-hero {
+  text-align: center;
+  padding: var(--sp-8) 0 var(--sp-6);
+}
+
+.result-hero__emoji {
+  font-size: 3.25rem;
+  line-height: 1;
+  margin-bottom: var(--sp-3);
+}
+
+.result-hero__eyebrow {
+  margin-bottom: var(--sp-3);
+}
+
+.result-hero__title {
+  font-size: var(--fs-3xl);
+  line-height: 1.05;
+  margin-bottom: var(--sp-3);
+}
+
+.result-hero__tagline {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--fs-md);
+  color: var(--iris-strong);
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.result-hero__ring {
+  display: flex;
+  justify-content: center;
+  margin: var(--sp-6) 0;
+}
+
+.result-hero__description {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  max-width: 480px;
+  margin: 0 auto var(--sp-6);
+}
+
+/* Bloques de contenido del resultado: fortalezas, "lo que te define",
+   lado menos bueno, películas... cada uno entra con AnimatedSection. */
+.result-block {
+  text-align: left;
+  margin: var(--sp-7) 0;
+}
+
+.result-block__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  margin-bottom: var(--sp-3);
+}
+
+.result-block__hint {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  font-style: italic;
+  margin-bottom: var(--sp-3);
+}
+
+.result-traits__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.result-traits__list li {
+  position: relative;
+  padding-left: var(--sp-5);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.result-traits__list--positive li::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--success);
+  font-weight: 700;
+}
+
+.result-traits__list--caution li::before {
+  content: "–";
+  position: absolute;
+  left: 0;
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.result-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.result-section__heading {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  margin-bottom: var(--sp-2);
+}
+
+.result-section__text {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+.result-movie-list {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.result-movie-list li {
+  font-size: var(--fs-sm);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.result-disclaimer {
+  font-size: var(--fs-xs);
+  color: var(--muted-soft);
+  margin-top: var(--sp-6);
+  font-style: italic;
+}
+
+/* Frase final memorable — pull-quote destacado, pensado para el pantallazo. */
+.result-quote {
+  background: var(--iris-tint);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-7) var(--sp-6);
+  margin: var(--sp-7) 0;
+}
+
+.result-quote__text {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--fs-lg);
+  line-height: 1.35;
+  color: var(--iris-strong);
+  text-align: center;
+}
+
+.result-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: var(--sp-7) 0;
+}
+
+.result-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.result-stat__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.result-stat__value {
+  font-family: var(--font-mono);
+  color: var(--iris-strong);
+}
+
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: var(--sp-7) 0;
+}
+
+@media (min-width: 480px) {
+  .result-actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+
+.result-cta {
+  background: var(--ink);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  text-align: center;
+  margin: var(--sp-8) 0;
+}
+
+.result-cta__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  margin-bottom: var(--sp-4);
+}
+
+/* Fila secundaria bajo los botones principales: copiar enlace + feedback. */
+.result-copy-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  margin-top: calc(var(--sp-3) * -1);
+  margin-bottom: var(--sp-7);
+  text-align: center;
+}
+
+.result-copy-feedback {
+  font-size: var(--fs-sm);
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* CTA de retención: repetir el mismo test. */
+.restart-cta {
+  text-align: center;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  margin: var(--sp-7) 0;
+}
+
+.restart-cta__text {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  margin-bottom: var(--sp-4);
+}
+
+/* ---------- Header ---------- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  background: rgba(244, 243, 246, 0.86);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-header__inner {
+  width: 100%;
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 var(--sp-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-md);
+  color: var(--ink);
+}
+
+.brand__mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid var(--iris);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.brand__mark::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: var(--iris);
+}
+
+/* Nav de escritorio, oculta en móvil */
+.site-header__nav {
+  display: none;
+}
+
+@media (min-width: 720px) {
+  .site-header__nav {
+    display: flex;
+    gap: var(--sp-6);
+  }
+
+  .site-header__nav a {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--muted);
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+
+  .site-header__nav a.active,
+  .site-header__nav a:hover {
+    color: var(--ink);
+  }
+}
+
+/* ---------- BottomNav (mobile-first, navegación a una mano) ---------- */
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  height: var(--bottomnav-h);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border);
+  display: flex;
+}
+
+.bottom-nav__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 48px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  transition: color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.bottom-nav__item svg {
+  width: 22px;
+  height: 22px;
+}
+
+.bottom-nav__item.active {
+  color: var(--iris-strong);
+}
+
+.bottom-nav__item:active {
+  transform: scale(0.92);
+}
+
+@media (min-width: 720px) {
+  .bottom-nav {
+    display: none;
+  }
+}
+
+/* ---------- PageContainer ---------- */
+.page {
+  min-height: calc(100vh - var(--header-h));
+  padding-bottom: calc(var(--bottomnav-h) + var(--sp-8));
+}
+
+@media (min-width: 720px) {
+  .page {
+    padding-bottom: var(--sp-9);
+  }
+}
+
+/* ---------- Footer ---------- */
+.site-footer {
+  display: none;
+}
+
+@media (min-width: 720px) {
+  .site-footer {
+    display: block;
+    border-top: 1px solid var(--border);
+    padding: var(--sp-7) 0 var(--sp-9);
+    margin-top: var(--sp-9);
+  }
+
+  .site-footer__inner {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 0 var(--sp-5);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--muted);
+    font-size: var(--fs-sm);
+  }
+
+  .site-footer__links {
+    display: flex;
+    gap: var(--sp-5);
+  }
+}
+
+.section-title {
+  font-size: var(--fs-lg);
+  margin: var(--sp-8) 0 var(--sp-4);
+}
+
+.section-title:first-child {
+  margin-top: var(--sp-6);
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  padding: var(--sp-8) 0 var(--sp-6);
+}
+
+.hero__eyebrow {
+  margin-bottom: var(--sp-4);
+}
+
+.hero__title {
+  font-size: var(--fs-3xl);
+  margin-bottom: var(--sp-4);
+}
+
+.hero__title em {
+  font-style: normal;
+  color: var(--iris-strong);
+}
+
+.hero__subtitle {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  max-width: 460px;
+  margin-bottom: var(--sp-7);
+}
+
+.hero__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+@media (min-width: 480px) {
+  .hero__actions {
+    flex-direction: row;
+  }
+}
+
+.hero__stat-row {
+  display: flex;
+  gap: var(--sp-6);
+  margin-top: var(--sp-8);
+}
+
+.hero__stat-number {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xl);
+  color: var(--ink);
+}
+
+.hero__stat-label {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* ---------- Test destacado (Home) ---------- */
+.featured-test {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  background: linear-gradient(135deg, var(--iris-tint), var(--amber-tint));
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  margin-bottom: var(--sp-5);
+}
+
+.featured-test__icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.featured-test__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  margin-bottom: var(--sp-2);
+}
+
+.featured-test__description {
+  color: var(--ink);
+  opacity: 0.85;
+  font-size: var(--fs-sm);
+  margin-bottom: var(--sp-4);
+  max-width: 460px;
+}
+
+@media (min-width: 560px) {
+  .featured-test {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .featured-test__body {
+    flex: 1;
+  }
+}
+
+.home-upcoming-grid {
+  margin-top: var(--sp-2);
+}
+
+/* ---------- Listados (Tests / Juegos) ---------- */
+.list-page__head {
+  padding: var(--sp-6) 0 var(--sp-3);
+}
+
+.list-page__title {
+  font-size: var(--fs-2xl);
+  margin-bottom: var(--sp-2);
+}
+
+.list-page__subtitle {
+  color: var(--muted);
+}
+
+.list-page__grid {
+  margin-top: var(--sp-5);
+}
+
+/* ---------- Detalle (intro antes de empezar) ---------- */
+.detail-intro {
+  text-align: center;
+  padding: var(--sp-9) 0 var(--sp-6);
+}
+
+.detail-intro__icon {
+  font-size: 2.75rem;
+  margin-bottom: var(--sp-4);
+}
+
+.detail-intro__title {
+  font-size: var(--fs-2xl);
+  margin-bottom: var(--sp-4);
+}
+
+.detail-intro__text {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  max-width: 440px;
+  margin: 0 auto var(--sp-7);
+}
+
+/* ---------- CTA de continuidad ---------- */
+.continue-cta {
+  background: var(--ink);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: var(--sp-7) var(--sp-6);
+  text-align: center;
+  margin: var(--sp-8) 0;
+}
+
+.continue-cta__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  margin-bottom: var(--sp-5);
+}
+
+.ad-section {
+  margin: var(--sp-8) 0;
+}
+
+/* ---------- Recomendaciones ---------- */
+.recommendations {
+  margin-top: var(--sp-8);
+}
+
+/* ---------- Not found ---------- */
+.not-found {
+  text-align: center;
+  padding: var(--sp-10) 0;
+}
+
+.not-found__title {
+  font-size: var(--fs-2xl);
+  margin-bottom: var(--sp-4);
+}
+
+/* ---------- Placeholder "Pareja" (sección aún sin contenido) ---------- */
+.placeholder-page {
+  text-align: center;
+  padding: var(--sp-10) var(--sp-4);
+}
+
+.placeholder-page__title {
+  font-size: var(--fs-2xl);
+  margin-bottom: var(--sp-3);
+}
+
+.placeholder-page__text {
+  color: var(--muted);
+  max-width: 380px;
+  margin: 0 auto;
+}
+
+/**
+ * Tests "próximamente": solo metadatos para mostrarlos en la Home como
+ * adelanto de la plataforma. NO tienen lógica ni páginas propias todavía.
+ *
+ * Cuando uno de estos tests se construya de verdad, se elimina de aquí y se
+ * añade a `data/tests/index.js` (TESTS) siguiendo el esquema de
+ * `personality.js` — la Home no necesita ningún cambio para reflejarlo.
+ *
+ * Campos: id, title, description, icon, to (ruta si ya existe una página
+ * real a la que enlazar, si no, se omite y la tarjeta no es pulsable).
+ */
+export const UPCOMING_TESTS = [
+  {
+    id: "pareja",
+    title: "¿Qué tipo de pareja eres?",
+    description: "Cómo amas, qué necesitas y qué evitas sin darte cuenta.",
+    icon: "❤️",
+    to: "/pareja",
+  },
+  {
+    id: "amigo",
+    title: "¿Qué amigo eres?",
+    description: "El papel que ocupas de verdad dentro de tu grupo.",
+    icon: "👥",
+  },
+  {
+    id: "personaje",
+    title: "¿Qué personaje eres?",
+    description: "Tu versión en una serie, peli o videojuego.",
+    icon: "🎬",
+  },
+];
+
+import { personalityTest } from "./personality.js";
+import { resolveResult } from "../../engines/scoring.js";
+
+export { UPCOMING_TESTS } from "./upcoming.js";
+
+/**
+ * Registro central de tests. Añadir un test nuevo consiste en:
+ * 1) crear su archivo de datos siguiendo el esquema de personality.js
+ * 2) importarlo y añadirlo aquí.
+ * Ningún componente necesita cambios para soportar un test nuevo: la Home
+ * ya recorre `TESTS` filtrando por `status` para decidir qué mostrar como
+ * destacado.
+ *
+ * (Los tests de pareja, amigos y personajes se añadirán en próximas fases;
+ * mientras tanto se listan como adelanto en `upcoming.js`.)
+ */
+export const TESTS = [personalityTest];
+
+export function getTestBySlug(slug) {
+  return TESTS.find((t) => t.slug === slug);
+}
+
+export function getResultByKey(test, key, statValues) {
+  return resolveResult(test, key, statValues);
+}
+
+/**
+ * Test de personalidad — "¿Qué tipo de personalidad tienes?"
+ * 15 preguntas basadas en escenarios cotidianos (fiestas, dinero, trabajo,
+ * conflictos, presión...). Cada opción hace dos cosas a la vez:
+ *  - `weight`: suma puntos a uno de los 8 arquetipos (decide quién gana)
+ *  - `dimensions`: suma puntos a rasgos medibles reales (disciplina, empatía...)
+ * Las estadísticas que ve el usuario en el resultado salen de `dimensions`,
+ * normalizadas 0-100 según el máximo posible en este test: no son números
+ * fijos, se derivan de sus respuestas (ver engines/scoring.js).
+ */
+
+// Etiquetas legibles de cada dimensión medida, usadas para las barras de stats.
+const dimensionLabels = {
+  sociabilidad: "Sociabilidad",
+  ambicion: "Ambición",
+  disciplina: "Disciplina",
+  impulsividad: "Impulsividad",
+  empatia: "Empatía",
+  creatividad: "Creatividad",
+  logica: "Lógica",
+  independencia: "Independencia",
+  riesgo: "Tolerancia al riesgo",
+  curiosidad: "Curiosidad",
+  confianza: "Confianza",
+};
+
+export const personalityTest = {
+  slug: "test-de-personalidad",
+  title: "¿Qué tipo de personalidad tienes?",
+  category: "Personalidad",
+  icon: "🧠",
+  status: "available",
+  teaser: "15 preguntas rápidas. 8 resultados posibles. Uno de ellos eres tú.",
+  intro:
+    "15 escenarios de la vida real —fiestas, dinero, trabajo, conflictos, presión— y ninguna respuesta correcta. Al final descubrirás cuál de los 8 perfiles te define mejor, con estadísticas calculadas a partir de tus propias respuestas.",
+  resultLogic: "weighted",
+  dimensionLabels,
+  disclaimer: "Resultado orientativo creado con fines de entretenimiento. No constituye asesoramiento profesional ni una predicción científica.",
+  questions: [
+    {
+      id: "q1",
+      text: "Llegas a una fiesta donde apenas conoces a nadie. Después de 20 minutos…",
+      options: [
+        { id: "a", text: "Ya estás en el centro de una conversación de grupo", weight: { lider: 2 }, dimensions: { sociabilidad: 2, confianza: 1 } },
+        { id: "b", text: "Has encontrado a alguien interesante y habláis en profundidad", weight: { analista: 2 }, dimensions: { logica: 1, independencia: 1 } },
+        { id: "c", text: "Observas desde un rincón, decidiendo si merece la pena quedarte", weight: { estratega: 2 }, dimensions: { disciplina: 1, impulsividad: -1 } },
+        { id: "d", text: "Te has escapado a curiosear por otra sala", weight: { explorador: 2 }, dimensions: { curiosidad: 2, riesgo: 1 } },
+      ],
+    },
+    {
+      id: "q2",
+      text: "En el trabajo o los estudios te asignan un proyecto sin instrucciones claras. ¿Qué haces primero?",
+      options: [
+        { id: "a", text: "Trazas un plan detallado con plazos", weight: { estratega: 2 }, dimensions: { disciplina: 2, logica: 1 } },
+        { id: "b", text: "Reúnes al equipo y repartes roles con decisión", weight: { lider: 2 }, dimensions: { sociabilidad: 1, confianza: 2 } },
+        { id: "c", text: "Empiezas a probar cosas para ver qué funciona", weight: { explorador: 2 }, dimensions: { riesgo: 2, curiosidad: 1 } },
+        { id: "d", text: "Investigas a fondo antes de mover un dedo", weight: { analista: 2 }, dimensions: { logica: 2, curiosidad: 1 } },
+      ],
+    },
+    {
+      id: "q3",
+      text: "Un amigo te cuenta un problema personal serio. Tu primer impulso es…",
+      options: [
+        { id: "a", text: "Escucharle y ponerte en su lugar antes de decir nada", weight: { protector: 2 }, dimensions: { empatia: 2 } },
+        { id: "b", text: "Ofrecerle un par de soluciones prácticas ya mismo", weight: { estratega: 1, lider: 1 }, dimensions: { logica: 1, confianza: 1 } },
+        { id: "c", text: "Contarle cómo te sentirías tú en su lugar", weight: { sonador: 2 }, dimensions: { empatia: 1, creatividad: 1 } },
+        { id: "d", text: "Ayudarle a montar un plan de acción concreto", weight: { estratega: 2 }, dimensions: { disciplina: 1, empatia: 1 } },
+      ],
+    },
+    {
+      id: "q4",
+      text: "Te ofrecen un puesto bien pagado pero muy rutinario. Tu reacción es…",
+      options: [
+        { id: "a", text: "Aceptarlo: la estabilidad pesa más que la emoción", weight: { protector: 1, estratega: 1 }, dimensions: { disciplina: 1, riesgo: -1 } },
+        { id: "b", text: "Rechazarlo, necesitas algo que te rete constantemente", weight: { explorador: 2 }, dimensions: { riesgo: 2, curiosidad: 1 } },
+        { id: "c", text: "Negociar mejores condiciones antes de decidir nada", weight: { lider: 2 }, dimensions: { confianza: 2, ambicion: 1 } },
+        { id: "d", text: "Aceptarlo un tiempo mientras maduras tu propio proyecto", weight: { rebelde: 1, creativo: 1 }, dimensions: { independencia: 1, creatividad: 1 } },
+      ],
+    },
+    {
+      id: "q5",
+      text: "En un debate, alguien rebate tu opinión con datos sólidos. ¿Qué haces?",
+      options: [
+        { id: "a", text: "Revisas tu postura, los datos mandan", weight: { analista: 2 }, dimensions: { logica: 2 } },
+        { id: "b", text: "Defiendes tu punto con más fuerza: no te gusta perder", weight: { lider: 1, rebelde: 1 }, dimensions: { confianza: 1, impulsividad: 1 } },
+        { id: "c", text: "Buscas un término medio que deje a todos tranquilos", weight: { protector: 2 }, dimensions: { empatia: 1, sociabilidad: 1 } },
+        { id: "d", text: "Te desconectas un poco, el conflicto no va contigo", weight: { sonador: 2 }, dimensions: { empatia: 1, impulsividad: -1 } },
+      ],
+    },
+    {
+      id: "q6",
+      text: "Tienes un fin de semana completamente libre. ¿Qué termina pasando?",
+      options: [
+        { id: "a", text: "Organizas una actividad para aprovecharlo al máximo", weight: { estratega: 2 }, dimensions: { disciplina: 2 } },
+        { id: "b", text: "Sales sin rumbo fijo a ver qué encuentras", weight: { explorador: 2 }, dimensions: { curiosidad: 2, riesgo: 1 } },
+        { id: "c", text: "Te metes de lleno en un proyecto creativo propio", weight: { creativo: 2 }, dimensions: { creatividad: 2, independencia: 1 } },
+        { id: "d", text: "Aprovechas para cuidar de alguien cercano", weight: { protector: 2 }, dimensions: { empatia: 2 } },
+      ],
+    },
+    {
+      id: "q7",
+      text: "En un juego de mesa con amigos, sueles ser quien…",
+      options: [
+        { id: "a", text: "Explica las reglas y vigila que se cumplan", weight: { estratega: 1, lider: 1 }, dimensions: { disciplina: 1, sociabilidad: 1 } },
+        { id: "b", text: "Se las salta si nadie mira, «solo es un juego»", weight: { rebelde: 2 }, dimensions: { impulsividad: 2, independencia: 1 } },
+        { id: "c", text: "Inventa estrategias poco convencionales para ganar", weight: { creativo: 2 }, dimensions: { creatividad: 2 } },
+        { id: "d", text: "Disfruta más del ambiente que de ganar", weight: { sonador: 2 }, dimensions: { empatia: 1, ambicion: -1 } },
+      ],
+    },
+    {
+      id: "q8",
+      text: "Un proyecto en el que confiabas fracasa por completo. ¿Cómo reaccionas?",
+      options: [
+        { id: "a", text: "Analizas qué falló, punto por punto", weight: { analista: 2 }, dimensions: { logica: 2, disciplina: 1 } },
+        { id: "b", text: "Te lo tomas como algo personal durante un tiempo", weight: { sonador: 1, protector: 1 }, dimensions: { empatia: 1, confianza: -1 } },
+        { id: "c", text: "Ya estás pensando en la siguiente idea", weight: { explorador: 2 }, dimensions: { curiosidad: 1, riesgo: 1 } },
+        { id: "d", text: "Reorganizas todo y lo intentas con un plan mejor", weight: { estratega: 2 }, dimensions: { disciplina: 2 } },
+      ],
+    },
+    {
+      id: "q9",
+      text: "Alguien dice algo que te parece injusto delante de otras personas. Tú…",
+      options: [
+        { id: "a", text: "Lo señalas ahí mismo, sin rodeos", weight: { rebelde: 2 }, dimensions: { impulsividad: 2, confianza: 1 } },
+        { id: "b", text: "Esperas al momento adecuado para hablarlo en privado", weight: { protector: 1, estratega: 1 }, dimensions: { disciplina: 1, empatia: 1 } },
+        { id: "c", text: "Te callas, pero te queda dando vueltas todo el día", weight: { sonador: 2 }, dimensions: { empatia: 1, confianza: -1 } },
+        { id: "d", text: "Respondes con autoridad y dejas claro tu punto", weight: { lider: 2 }, dimensions: { confianza: 2, sociabilidad: 1 } },
+      ],
+    },
+    {
+      id: "q10",
+      text: "Te apuntas a una actividad totalmente nueva para ti. Antes de empezar…",
+      options: [
+        { id: "a", text: "Investigas todo lo posible sobre ella", weight: { analista: 2 }, dimensions: { logica: 1, curiosidad: 1 } },
+        { id: "b", text: "Simplemente te lanzas, ya aprenderás sobre la marcha", weight: { explorador: 2 }, dimensions: { riesgo: 2, impulsividad: 1 } },
+        { id: "c", text: "Imaginas cómo te gustaría que fuera la experiencia", weight: { sonador: 2 }, dimensions: { creatividad: 1, empatia: 1 } },
+        { id: "d", text: "Preparas un plan para dominarla cuanto antes", weight: { estratega: 2 }, dimensions: { disciplina: 2, ambicion: 1 } },
+      ],
+    },
+    {
+      id: "q11",
+      text: "En el trabajo o los estudios, lo que más te motiva es…",
+      options: [
+        { id: "a", text: "Liderar y ver crecer a un equipo", weight: { lider: 2 }, dimensions: { ambicion: 2, sociabilidad: 1 } },
+        { id: "b", text: "Resolver problemas complejos con lógica", weight: { analista: 2 }, dimensions: { logica: 2, independencia: 1 } },
+        { id: "c", text: "Crear algo que antes no existía", weight: { creativo: 2 }, dimensions: { creatividad: 2 } },
+        { id: "d", text: "Sentir que ayudas a alguien de verdad", weight: { protector: 2 }, dimensions: { empatia: 2 } },
+      ],
+    },
+    {
+      id: "q12",
+      text: "Cuando algo no sale como esperabas, tu primer impulso es…",
+      options: [
+        { id: "a", text: "Cuestionar las reglas que lo impidieron", weight: { rebelde: 2 }, dimensions: { independencia: 2, impulsividad: 1 } },
+        { id: "b", text: "Buscar otra ruta: hay mil formas de llegar", weight: { explorador: 2 }, dimensions: { curiosidad: 1, riesgo: 1 } },
+        { id: "c", text: "Sentir que quizás esperabas demasiado", weight: { sonador: 2 }, dimensions: { empatia: 1, confianza: -1 } },
+        { id: "d", text: "Ajustar el plan y seguir adelante con método", weight: { estratega: 2 }, dimensions: { disciplina: 1, logica: 1 } },
+      ],
+    },
+    {
+      id: "q13",
+      text: "Un desconocido te pide ayuda por la calle. Tú…",
+      options: [
+        { id: "a", text: "Te detienes a ayudar aunque llegues tarde a algo", weight: { protector: 2 }, dimensions: { empatia: 2 } },
+        { id: "b", text: "Evalúas rápido la situación antes de actuar", weight: { analista: 1, estratega: 1 }, dimensions: { logica: 1, disciplina: 1 } },
+        { id: "c", text: "Le ayudas improvisando una solución original", weight: { creativo: 2 }, dimensions: { creatividad: 1, riesgo: 1 } },
+        { id: "d", text: "Te implicas más de la cuenta, hasta acompañarle si hace falta", weight: { sonador: 2 }, dimensions: { empatia: 2 } },
+      ],
+    },
+    {
+      id: "q14",
+      text: "Puedes elegir entre un ascenso con más responsabilidad o mantener tu libertad actual. Eliges…",
+      options: [
+        { id: "a", text: "El ascenso: quieres tener el control de las decisiones", weight: { lider: 2 }, dimensions: { ambicion: 2, confianza: 1 } },
+        { id: "b", text: "La libertad: ningún cargo vale tu independencia", weight: { rebelde: 2 }, dimensions: { independencia: 2 } },
+        { id: "c", text: "Depende, primero calculas los pros y los contras con calma", weight: { estratega: 2 }, dimensions: { logica: 1, disciplina: 1 } },
+        { id: "d", text: "La libertad: necesitas espacio para crear a tu manera", weight: { creativo: 2 }, dimensions: { creatividad: 1, independencia: 1 } },
+      ],
+    },
+    {
+      id: "q15",
+      text: "Miras atrás a este último año. ¿Qué es lo que más valoras haber hecho?",
+      options: [
+        { id: "a", text: "Haber alcanzado metas concretas que te propusiste", weight: { estratega: 2 }, dimensions: { disciplina: 1, ambicion: 1 } },
+        { id: "b", text: "Haber vivido experiencias que no esperabas", weight: { explorador: 2 }, dimensions: { curiosidad: 2, riesgo: 1 } },
+        { id: "c", text: "Haber estado ahí para las personas que importan", weight: { protector: 2 }, dimensions: { empatia: 2, sociabilidad: 1 } },
+        { id: "d", text: "Haber sido fiel a lo que sientes, aunque no fuera fácil", weight: { sonador: 2 }, dimensions: { creatividad: 1, confianza: 1 } },
+      ],
+    },
+  ],
+  results: [
+    {
+      key: "estratega",
+      title: "El Estratega",
+      emoji: "🧩",
+      tagline: "Ya vas por el plan B mientras los demás siguen presentando el A.",
+      closingLine: "Si esto fuera una partida, ya habrías ganado dos turnos antes de que empezara.",
+      description:
+        "Antes de dar un paso, probablemente ya has pensado en los siguientes tres. Ves el mundo como un tablero de decisiones y te sientes más cómodo con un plan en la mano que improvisando sobre la marcha. No es frialdad: es tu forma de proteger lo que te importa.",
+      strengths: ["Visión de largo plazo", "Toma de decisiones estructurada", "Constancia bajo presión", "Capacidad de anticipar problemas"],
+      weaknesses: ["Te cuesta improvisar cuando el plan se rompe", "Puedes parecer distante al priorizar la lógica", "Sobrepensar antes de actuar"],
+      weaknessesLabel: "Tu lado menos bueno (con encanto)",
+      sections: [
+        { heading: "Cómo funcionas", text: "Recopilas información, pesas opciones y eliges la que minimiza riesgos, aunque tardes más que otros perfiles en decidirte. Necesitas sentir que controlas la situación antes de comprometerte con ella." },
+        { heading: "Cómo te comportas socialmente", text: "Observas antes de participar y prefieres conversaciones con propósito a la charla puramente social." },
+      ],
+      statKeys: ["disciplina", "logica", "impulsividad", "ambicion", "confianza", "curiosidad"],
+      fallbackStats: { disciplina: 92, logica: 88, impulsividad: 20, ambicion: 74, confianza: 70, curiosidad: 55 },
+      recommendedSlug: { type: "game", slug: "tiempo-de-reaccion" },
+      nextStepText: "Tu forma de pensar ya está clara. Pero, ¿piensas igual de rápido cuando no hay tiempo para planear?",
+    },
+    {
+      key: "lider",
+      title: "El Líder",
+      emoji: "👑",
+      tagline: "La gente te mira buscando la señal de que todo va a salir bien.",
+      closingLine: "No naciste para seguir el plan de nadie. Naciste para ser tú quien lo escriba.",
+      description:
+        "La gente tiende a mirarte cuando hay que tomar una decisión, y tú rara vez rehúyes esa mirada. Tienes una confianza natural para dirigir, y sabes que liderar no siempre significa tener razón, sino asumir la responsabilidad cuando otros dudan.",
+      strengths: ["Capacidad de decisión bajo presión", "Habilidad para movilizar a un grupo", "Confianza que transmite seguridad", "Buen manejo de conflictos"],
+      weaknesses: ["Puedes imponer tu ritmo sin darte cuenta", "Te cuesta delegar el control", "Baja tolerancia a la indecisión ajena"],
+      weaknessesLabel: "Tu lado menos bueno (con encanto)",
+      sections: [
+        { heading: "Cómo funcionas", text: "Decides rápido y con seguridad, confiando en tu criterio incluso con información incompleta. Prefieres equivocarte actuando que quedarte parado esperando el momento perfecto." },
+        { heading: "Cómo te comportas socialmente", text: "Te mueves con naturalidad en grupo, tomas la palabra sin esfuerzo y sueles acabar organizando lo que otros dejan a medias." },
+      ],
+      statKeys: ["ambicion", "confianza", "sociabilidad", "disciplina", "empatia", "impulsividad"],
+      fallbackStats: { ambicion: 90, confianza: 88, sociabilidad: 82, disciplina: 66, empatia: 54, impulsividad: 48 },
+      recommendedSlug: { type: "game", slug: "tiempo-de-reaccion" },
+      nextStepText: "Sabes liderar cuando hay tiempo de pensar. ¿Y cuando solo hay una fracción de segundo para reaccionar?",
+    },
+    {
+      key: "explorador",
+      title: "El Explorador",
+      emoji: "🧭",
+      tagline: "Tu vida sigue un mapa que solo tú sabes leer.",
+      closingLine: "Si llevas tres días seguidos sin planes, algo va mal en el universo.",
+      description:
+        "La rutina te pesa más que el riesgo. Prefieres equivocarte probando algo nuevo que quedarte quieto por miedo, y esa curiosidad constante te lleva a lugares —físicos y mentales— a los que otros nunca llegan.",
+      strengths: ["Adaptabilidad a lo inesperado", "Apertura genuina a experiencias nuevas", "Capacidad de reinventarse", "Optimismo ante el cambio"],
+      weaknesses: ["Constancia irregular en proyectos largos", "Tiende a dejar cosas a medias", "Puede subestimar el riesgo real"],
+      weaknessesLabel: "Tu lado menos bueno (con encanto)",
+      sections: [
+        { heading: "Cómo funcionas", text: "Decides por instinto y corriges sobre la marcha; para ti, actuar y aprender vale más que planear en exceso." },
+        { heading: "Cómo te comportas socialmente", text: "Conectas rápido con desconocidos y disfrutas de ambientes nuevos más que de círculos cerrados." },
+      ],
+      statKeys: ["curiosidad", "riesgo", "impulsividad", "independencia", "disciplina", "empatia"],
+      fallbackStats: { curiosidad: 94, riesgo: 85, impulsividad: 64, independencia: 70, disciplina: 38, empatia: 56 },
+      recommendedSlug: { type: "game", slug: "tiempo-de-reaccion" },
+      nextStepText: "Te lanzas a lo nuevo sin dudarlo. ¿Tus reflejos van a la misma velocidad que tu curiosidad?",
+    },
+    {
+      key: "analista",
+      title: "El Analista",
+      emoji: "🔍",
+      tagline: "No opinas hasta tener los datos. Y aun con datos, lo piensas dos veces.",
+      closingLine: "No das la respuesta rápida, pero cuando la das, ya nadie la discute.",
+      description:
+        "Necesitas entender el «por qué» antes de aceptar el «qué». Cuestionas, comparas y buscas la explicación más coherente, y eso te convierte en la persona a la que otros acuden cuando algo no cuadra.",
+      strengths: ["Pensamiento crítico afilado", "Objetividad incluso en temas sensibles", "Alta capacidad de concentración", "Rigor en el detalle"],
+      weaknesses: ["Puede parecer frío al priorizar los hechos", "Tiende a la parálisis por análisis", "Le cuesta actuar con información incompleta"],
+      weaknessesLabel: "Tu lado menos bueno (con encanto)",
+      sections: [
+        { heading: "Cómo funcionas", text: "No te mueves sin datos suficientes; prefieres retrasar una decisión antes que tomarla a ciegas." },
+        { heading: "Cómo te comportas socialmente", text: "Eliges pocas conversaciones, pero profundas; el ruido social te agota más de lo que te aporta." },
+      ],
+      statKeys: ["logica", "independencia", "sociabilidad", "disciplina", "curiosidad", "impulsividad"],
+      fallbackStats: { logica: 93, independencia: 80, sociabilidad: 34, disciplina: 76, curiosidad: 68, impulsividad: 18 },
+      recommendedSlug: { type: "game", slug: "tiempo-de-reaccion" },
+      nextStepText: "Analizas cada detalle antes de actuar. ¿Qué pasa cuando no te da tiempo a analizar nada?",
+    },
+    {
+      key: "creativo",
+      title: "El Creativo",
+      emoji: "🎨",
+      tagline: "Ves una lámpara y ya piensas en siete cosas que no es.",
+      closingLine: "El mundo todavía no sabía que necesitaba eso, hasta que se te ocurrió a ti.",
+      description:
+        "Ves conexiones donde otros ven caos. Tu mente rara vez sigue el camino más obvio, y esa forma distinta de mirar las cosas es tanto tu mayor activo como, a veces, tu mayor fuente de incomprensión ajena.",
+      strengths: ["Originalidad para resolver problemas", "Capacidad de imaginar lo que no existe", "Flexibilidad mental", "Sensibilidad estética"],
+      weaknesses: ["Dificultad para seguir procesos rígidos", "Tiende a dispersarse entre ideas", "Le cuesta la crítica directa a su trabajo"],
+      weaknessesLabel: "Tu lado menos bueno (con encanto)",
+      sections: [
+        { heading: "Cómo funcionas", text: "Decides siguiendo una mezcla de intuición y visión propia, más que reglas o consensos externos." },
+        { heading: "Cómo te comportas socialmente", text: "Aportas ideas inesperadas al grupo, aunque a veces necesitas tiempo a solas para recargar." },
+      ],
+      statKeys: ["creatividad", "independencia", "curiosidad", "disciplina", "confianza", "empatia"],
+      fallbackStats: { creatividad: 95, independencia: 78, curiosidad: 82, disciplina: 42, confianza: 60, empatia: 62 },
+      recommendedSlug: { type: "game", slug: "tiempo-de-reaccion" },
+      nextStepText: "Tu mente conecta ideas que otros no ven. ¿Y cómo de rápido conecta tu mano con lo que ven tus ojos?",
+    },
+    {
+      key: "protector",
+      title: "El Protector",
+      emoji: "🛡️",
+      tagline: "Preguntas «¿estás bien?» antes de que nadie lo pregunte contigo.",
+      closingLine: "El grupo no sabe ni la mitad de las cosas que arreglas en silencio.",
+      description:
+        "Cuidas antes de que te lo pidan. Tienes un radar afinado para detectar cuándo alguien no está bien, y sueles anteponer el bienestar del grupo al tuyo propio, incluso cuando nadie te lo agradece.",
+      strengths: ["Empatía genuina y constante", "Lealtad a largo plazo", "Buen gestor de conflictos ajenos", "Fiabilidad"],
+      weaknesses: ["Le cuesta poner límites", "Tiende a anteponerse siempre en último lugar", "Evita el conflicto incluso cuando es necesario"],
+      weaknessesLabel: "Tu lado menos bueno (con encanto)",
+      sections: [
+        { heading: "Cómo funcionas", text: "Ponderas cómo afecta cada opción a las personas implicadas antes que el resultado puramente práctico." },
+        { heading: "Cómo te comportas socialmente", text: "Eres quien mantiene unido al grupo, media en los roces y recuerda los detalles que a otros se les escapan." },
+      ],
+      statKeys: ["empatia", "sociabilidad", "riesgo", "disciplina", "confianza", "impulsividad"],
+      fallbackStats: { empatia: 93, sociabilidad: 74, riesgo: 28, disciplina: 66, confianza: 56, impulsividad: 24 },
+      recommendedSlug: { type: "game", slug: "tiempo-de-reaccion" },
+      nextStepText: "Cuidas de todos a tu alrededor. ¿Alguna vez te has puesto a prueba solo por diversión?",
+    },
+    {
+      key: "rebelde",
+      title: "El Rebelde",
+      emoji: "🔥",
+      tagline: "Te dijeron que no se podía. Ya sabes cómo terminó esa historia.",
+      closingLine: "Para ti, las reglas son sugerencias con muy mala redacción.",
+      description:
+        "Las normas te parecen un punto de partida, no un límite. Cuestionas lo establecido casi por reflejo, y aunque eso te trae fricción de vez en cuando, también es lo que te impide conformarte con «siempre se ha hecho así».",
+      strengths: ["Pensamiento independiente", "Valentía para desafiar lo establecido", "Autenticidad sin filtros", "Resistencia a la presión de grupo"],
+      weaknesses: ["Puede generar fricción innecesaria", "Le cuesta seguir estructuras impuestas", "Actúa antes de medir consecuencias"],
+      weaknessesLabel: "Tu lado menos bueno (con encanto)",
+      sections: [
+        { heading: "Cómo funcionas", text: "Actúas siguiendo tu propio criterio, incluso cuando eso significa ir contracorriente del grupo." },
+        { heading: "Cómo te comportas socialmente", text: "No buscas encajar; dices lo que piensas aunque incomode, y eso genera tanto admiración como roces." },
+      ],
+      statKeys: ["independencia", "impulsividad", "riesgo", "confianza", "disciplina", "empatia"],
+      fallbackStats: { independencia: 91, impulsividad: 76, riesgo: 80, confianza: 72, disciplina: 36, empatia: 50 },
+      recommendedSlug: { type: "game", slug: "tiempo-de-reaccion" },
+      nextStepText: "No sigues las reglas de nadie. ¿Tus reflejos son tan rápidos como tu carácter?",
+    },
+    {
+      key: "sonador",
+      title: "El Soñador",
+      emoji: "🌙",
+      tagline: "Sientes las cosas en HD mientras el resto las ve en blanco y negro.",
+      closingLine: "No vives nada a medias: o te lo da todo, o no cuenta.",
+      description:
+        "Sientes las cosas con una intensidad que no siempre sabes explicar. Te mueves por ideales más que por cálculos, y aunque el mundo práctico a veces te resulta agotador, tu forma de ver posibilidades donde otros ven límites es un don poco común.",
+      strengths: ["Idealismo que inspira a otros", "Sensibilidad emocional profunda", "Capacidad de imaginar futuros mejores", "Autenticidad emocional"],
+      weaknesses: ["Le cuesta bajar las ideas a la práctica", "Tiende a idealizar personas o planes", "Sensible en exceso a la crítica"],
+      weaknessesLabel: "Tu lado menos bueno (con encanto)",
+      sections: [
+        { heading: "Cómo funcionas", text: "Te guías por cómo te sientes respecto a cada opción más que por un cálculo frío de pros y contras." },
+        { heading: "Cómo te comportas socialmente", text: "Buscas vínculos profundos y significativos; la relación superficial te resulta poco satisfactoria." },
+      ],
+      statKeys: ["empatia", "creatividad", "confianza", "ambicion", "curiosidad", "disciplina"],
+      fallbackStats: { empatia: 85, creatividad: 80, confianza: 46, ambicion: 48, curiosidad: 66, disciplina: 40 },
+      recommendedSlug: { type: "game", slug: "tiempo-de-reaccion" },
+      nextStepText: "Vives con intensidad cada idea y cada emoción. ¿Qué tal se te da actuar en el momento exacto?",
+    },
+  ],
+};
